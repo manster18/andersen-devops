@@ -30,6 +30,7 @@ apt update
 apt install gawk
 ```
 
+
 ```sh
 $ ./task2.sh [DATABSE][OPTIONS]
 ```
