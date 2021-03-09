@@ -21,6 +21,16 @@ jq -r '.prices[]|@csv' quotes.json | awk -F "," '{print $2}' | tail -n 14 | awk 
 
 ## Usage script task2.sh:
 
+## Dependencies
+
+For this script to work correctly you need to install the GAWK package
+
+```sh
+apt update
+apt install gawk
+```
+
+
 ```sh
 $ ./task2.sh [DATABSE][OPTIONS]
 ```

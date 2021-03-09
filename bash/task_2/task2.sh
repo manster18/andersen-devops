@@ -67,6 +67,11 @@ while [ -n "$1" ]; do
   esac
 done
 
+#checking if the file "quotes.json" exists
+if [[ ! -f "$file" ]]; then
+  curl -s https://yandex.ru/news/quotes/graph_2000.json > $file
+fi
+
 #create table with human-readable date format
 while read -r line; do
   data_table+=( "$line" )
