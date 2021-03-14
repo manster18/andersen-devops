@@ -1,0 +1,13 @@
+[Unit]
+Description=Emoji_application
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+ExecStart=/usr/bin/python3 {{ app_dir }}/emoji_app.py
+User=manster
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,169 @@
+# Ansible playbook for the install SSH login with key to remote hosts.
+
+---
+- hosts: target_host
+  gather_facts: false
+  ignore_unreachable: yes
+
+  tasks:
+    - name: Include vars
+      include_vars:
+        dir: ../group_vars
+
+    - name: Install `gpg` (to get `gpg` util)
+      apt:
+        name: gpg
+        state: present
+
+    - name: Generate encrypted password
+      shell: gpg --gen-random --armor 1 24 #echo "{{ vault_ansible_sudo_pass }}"
+      register: generated_passwd
+
+    - name: "Ansible | Print a variable if defined"
+      debug:
+        msg: "The 'generated_passwd' variable value is {{ generated_passwd }}"
+      when: generated_passwd is defined
+
+    - name: Add user on remote server
+      user:
+        name: "{{remote_machine_username}}"
+        password: "{{generated_passwd.stdout}}"
+        groups:
+          - sudo
+        state: present
+        shell: /bin/bash
+        system: no
+        createhome: yes
+      ignore_errors: true
+
+- hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Include vars
+      include_vars:
+        dir: ../group_vars
+
+    - name: check .ssh local directory exists
+      stat:
+        path: "~/.ssh"
+      register: ssh_directory_exists_check
+
+    - debug:
+        var: ssh_directory_exists_check
+      when: debug_mode is defined
+
+    - name: Check and install ssh utils
+      apt:
+        name: sshpass
+        state: present
+
+    - name: Check needed OS tools exist
+      shell: which sshpass ssh-keygen ssh-copy-id
+      register: os_tools_exist
+      ignore_errors: true
+      changed_when: False
+
+    - name: Create ~/.ssh local directory
+      file:
+        path: "~/.ssh"
+        state: directory
+        mode: "0700"
+      register: ssh_directory_creation
+      when: ssh_directory_exists_check is defined and ssh_directory_exists_check.stat.exists == false
+
+    - debug:
+        var: ssh_directory_creation
+      when: debug_mode is defined
+
+    - name: Check .ssh key file exists
+      stat:
+        path: "~/.ssh/{{item}}"
+      register: ssh_key_file_exists_check
+      with_items:
+        - "{{ssh_key_filename}}"
+        - "{{ssh_key_filename}}.pub"
+
+    - debug:
+        var: ssh_key_file_exists_check.results[1].stat.exists
+      when: debug_mode is defined
+
+    - name: Generate ssh key on local machine
+      shell: "ssh-keygen -t rsa -f ~/.ssh/{{ssh_key_filename}} -P \"\""
+      register: ssh_key_creation
+      failed_when: ssh_key_creation.rc != 0
+      when: >
+        ssh_key_file_exists_check is defined and
+        (ssh_key_file_exists_check.results[0].stat.exists == false or
+        ssh_key_file_exists_check.results[1].stat.exists == false)
+
+    - debug:
+        var: ssh_key_creation
+      when: debug_mode is defined
+
+    - name: Check .ssh/config file exists
+      stat:
+        path: "~/.ssh/config"
+      register: ssh_config_file_exists_check
+
+    - debug:
+        var: ssh_config_file_exists_check
+      when: debug_mode is defined
+
+    - name: Create the ~/.ssh/config file
+      file:
+        path: "~/.ssh/config"
+        state: touch
+        mode: "0644"
+      register: ssh_config_file_creation
+      when: ssh_config_file_exists_check is defined and ssh_config_file_exists_check.stat.exists == false
+
+    - name: Add the new ssh key to the ~/.ssh/config file
+      lineinfile:
+        path: "~/.ssh/config"
+        line: "IdentityFile ~/.ssh/{{ssh_key_filename}}"
+        state: present
+        backup: yes
+      register: ssh_config_file_key_addition
+
+    - debug:
+        var: ssh_config_file_key_addition
+      when: debug_mode is defined
+
+    - name: Distribute the ssh key to the remote hosts
+      shell: "sshpass -p \"{{ansible_sudo_pass}}\" ssh-copy-id -o StrictHostKeyChecking=no -i ~/.ssh/{{ssh_key_filename}}.pub -p {{ hostvars[item].ansible_port }} \"{{remote_machine_username}}@{{ hostvars[item].ansible_host }}\""
+      with_items:
+        - "{{ groups['target_host']}}"
+      ignore_errors: yes
+      changed_when: false
+
+    - debug:
+        var: ssh_copy_id_execution
+      when: debug_mode is defined
+
+- hosts: target_host
+  gather_facts: false
+  ignore_unreachable: yes
+  become: yes
+
+  tasks:
+    - name: Disable ssh password auth
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^(#*)PasswordAuthentication'
+        line: "PasswordAuthentication no"
+      register: disable_password_auth
+
+    - name: Disable ssh root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^(#*)PermitRootLogin'
+        line: "PermitRootLogin no"
+      register: disable_root_login
+
+    - name: Restart sshd.service
+      service:
+        name: sshd
+        state: restarted
+        enabled: yes
+      when: disable_root_login.changed or disable_password_auth.changed

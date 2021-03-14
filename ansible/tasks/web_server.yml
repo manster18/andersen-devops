@@ -1,0 +1,39 @@
+# Ansible playbook to launch and install the web server
+
+---
+- hosts: target_host
+  become: yes
+  tasks:
+    - name: Install "nginx" package
+      apt:
+        name: nginx
+        state: present
+
+    - name: Remove default sites from "sites-enabled" directory
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Copy nginx config template to "sites-available" with name flask_app
+      template:
+        src: ../src/nginx.conf
+        dest: /etc/nginx/sites-available/flask_app
+      notify: restart_nginx
+
+    - name: Create link "flask_app" config to sites-enabled
+      file:
+        src: /etc/nginx/sites-available/flask_app
+        dest: /etc/nginx/sites-enabled/flask_app
+        state: link
+
+    - name: Start Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart_nginx
+      service:
+        name: nginx
+        state: restarted

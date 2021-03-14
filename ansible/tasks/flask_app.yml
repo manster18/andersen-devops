@@ -1,0 +1,65 @@
+# Ansible playbook to launch the app and install the necessary modules.
+
+---
+- hosts: target_host
+  become: yes
+  vars:
+    - app_dir: /usr/bin/emoji_app
+
+  tasks:
+    - name: Install neccessary apps
+      apt:
+        name:
+          - python3-pip
+          - python3-virtualenv
+          - python3-setuptools
+        state: present
+
+    - name: Install neccessary pip apps
+      pip:
+        name:
+          - Flask
+          - emoji
+        state: present
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+
+    - name: Copy "emoji_app.py" to the server
+      template:
+        src: ../application/emoji_app.py
+        dest: "{{ app_dir }}"
+        owner: root
+        group: root
+        mode: 0744
+      notify: restart_emoji_app
+
+    - name: Check if app script exist in "/etc/systemd/system/"
+      stat:
+        path: "/etc/systemd/system/emoji_app.service"
+      register: app_script_exists
+
+    - name: Copy app script template in "/etc/systemd/system/"
+      template:
+        src: ../src/emoji_app.service
+        dest: /etc/systemd/system/emoji_app.service
+        owner: root
+        group: root
+        mode: 0744
+      when: app_script_exists is defined and
+            app_script_exists.stat.exists == false
+      register: launch_script_created
+
+    - name: Start and enable application service
+      service:
+        name: emoji_app
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart_emoji_app
+      service:
+        name: emoji_app
+        state: restarted

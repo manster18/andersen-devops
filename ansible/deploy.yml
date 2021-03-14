@@ -1,0 +1,7 @@
+# Ansible playbook for sequential launch of all playbooks in order.
+
+---
+- import_playbook: tasks/access_by_ssh.yml
+- import_playbook: tasks/iptables_rules.yml
+- import_playbook: tasks/flask_app.yml
+- import_playbook: tasks/web_server.yml

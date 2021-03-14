@@ -1,0 +1,16 @@
+# Variables for the playbook
+---
+
+# You can use it for the first initial access to the remote host with root access using login
+ansible_password:               "{{ vault_ansible_pass }}"
+
+ansible_sudo_pass:              "{{ vault_ansible_sudo_pass }}"
+
+# key for the access after new keys will be created 
+ansible_ssh_private_key_file:   ~/.ssh/deploy_rsa
+ssh_key_filename:               deploy_rsa
+# uset to create a new user on a remote machine with ssh access
+remote_machine_username:        deploy
+
+# change interpritator for the python
+ansible_python_interpreter:     /usr/bin/python3
