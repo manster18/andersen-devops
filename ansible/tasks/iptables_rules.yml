@@ -1,0 +1,48 @@
+# Ansible playbook to establish firewall rules (`iptables`), and make it persistent.
+
+---
+- hosts: target_host
+  become: yes
+  tasks:
+    - name: Install iptables package
+      apt:
+        name: iptables
+        state: present
+
+    - name: Delete existing firewall rules on the host
+      iptables:
+        flush: true
+
+    - name: Allow all loopback traffic
+      iptables:
+        action: append
+        chain: INPUT
+        in_interface: lo
+        jump: ACCEPT
+
+    - name: Allow established connections
+      iptables:
+        chain: INPUT
+        ctstate: ESTABLISHED,RELATED
+        jump: ACCEPT
+
+    - name: Setting policy Allow to the port list
+      iptables:
+        chain: INPUT
+        destination_port: "{{ item }}"
+        jump: ACCEPT
+        protocol: tcp
+      loop:
+        - "22"
+        - "80"
+        - "443"
+
+    - name: Firewall rule - drop any traffic without rule
+      iptables:
+        chain: INPUT
+        jump: DROP
+
+    - name: Installing the "iptables-persistant" package for restore the rules
+      apt:
+        name: iptables-persistent
+        state: present
