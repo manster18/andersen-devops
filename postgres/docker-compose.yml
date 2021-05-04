@@ -1,0 +1,51 @@
+---
+version: "3.3"
+
+services:
+  primary:
+    image: postgres:11.11
+    hostname: postgres_primary
+    environment:
+    - POSTGRES_DB=test_db
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=password
+    - POSTGRES_REPLICATION_USER=replication
+    - POSTGRES_REPLICATION_PASSWORD=password
+    volumes:
+    - ${PWD}/pg_data_main:/var/lib/postgresql/data
+    - ${PWD}/pg_data_standby:/backup
+    ports:
+    - "5432"
+    networks:
+    - pg_network
+
+  standby:
+    image: postgres:11.11
+    hostname: postgres_standby
+    environment:
+    - POSTGRES_DB=test_db
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=password
+    - POSTGRES_REPLICATION_USER=replication
+    - POSTGRES_REPLICATION_PASSWORD=password
+    volumes:
+    - ${PWD}/pg_data_standby:/var/lib/postgresql/data
+    ports:
+    - "5432"
+    networks:
+    - pg_network
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+    networks:
+    - pg_network
+
+networks:
+  pg_network:
+
+volumes:
+  pg_data_main:
+  pg_data_standby:
